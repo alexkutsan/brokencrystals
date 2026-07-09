@@ -308,7 +308,7 @@ export class FileController {
     description: 'File deleted successfully'
   })
   async deleteFile(@Query('path') path: string): Promise<void> {
-    await this.fileService.deleteFile(path);
+    await this.fileService.deleteFile(this.validateLocalPath(path));
   }
 
   @Put('raw')
@@ -358,7 +358,7 @@ export class FileController {
     @Res({ passthrough: true }) res: FastifyReply
   ) {
     try {
-      const stream = await this.fileService.getFile(file);
+      const stream = await this.fileService.getFile(this.validateLocalPath(file));
       res.type('application/octet-stream');
 
       return stream;

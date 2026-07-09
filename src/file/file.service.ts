@@ -24,7 +24,7 @@ export class FileService {
     }
 
     const resolved = path.resolve(this.allowedRoot, normalized);
-    if (!resolved.startsWith(this.allowedRoot + path.sep)) {
+    if (resolved !== this.allowedRoot && !resolved.startsWith(this.allowedRoot + path.sep)) {
       throw new Error('Invalid file path');
     }
 
