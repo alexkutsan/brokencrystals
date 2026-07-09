@@ -56,9 +56,11 @@ export class ProductsService {
       const query = `
         select *
         from product
-        where name ilike '%${name}%';
+        where name ilike ?;
       `;
-      const rows = await this.em.getConnection().execute<Product[]>(query);
+      const rows = await this.em
+        .getConnection()
+        .execute<Product[]>(query, [`%${name}%`]);
 
       return rows.map((row: Product) => this.em.map(Product, row));
     } catch (err) {
@@ -71,14 +73,16 @@ export class ProductsService {
     }
   }
 
-  async updateProduct(query: string): Promise<void> {
+  async updateProduct(productName: string): Promise<void> {
     try {
-      this.logger.debug(`Updating products table with query "${query}"`);
-      await this.em.getConnection().execute(query);
+      this.logger.debug(`Updating products table for product "${productName}"`);
+      const query = `UPDATE product SET views_count = views_count + 1 WHERE name = ?`;
+      await this.em.getConnection().execute(query, [productName]);
       return;
     } catch (err) {
-      this.logger.warn(`Failed to execute query. Error: ${err.message}`);
-      throw new InternalServerErrorException(err.message);
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Failed to execute query. Error: ${message}`);
+      throw new InternalServerErrorException(message);
     }
   }
 }
