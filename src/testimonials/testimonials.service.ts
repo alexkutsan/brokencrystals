@@ -54,14 +54,20 @@ export class TestimonialsService {
     return t;
   }
 
-  async count(query: string): Promise<number> {
+  async count(): Promise<number> {
     try {
       this.logger.debug(`Saved new testimonial`);
 
-      return (await this.em.getConnection().execute(query))[0].count as number;
+      const result = await this.em
+        .getConnection()
+        .execute('select count(*) as count from testimonial');
+
+      return result[0].count as number;
     } catch (err) {
-      this.logger.warn(`Failed to execute query. Error: ${err.message}`);
-      return err.message;
+      this.logger.warn(
+        `Failed to execute testimonial count query. Error: ${err.message}`
+      );
+      throw new Error('An internal error has occurred.');
     }
   }
 }
