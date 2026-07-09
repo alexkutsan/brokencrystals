@@ -56,7 +56,7 @@ export class TestimonialsService {
 
   async count(): Promise<number> {
     try {
-      this.logger.debug(`Saved new testimonial`);
+      this.logger.debug(`Count testimonials`);
 
       const result = await this.em
         .getConnection()

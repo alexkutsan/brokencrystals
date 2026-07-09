@@ -87,12 +87,11 @@ export class TestimonialsController {
   }
 
   @Get('count')
-  @Header('content-type', 'text/html')
   @ApiOperation({
     description: API_DESC_GET_TESTIMONIALS_ON_SQL_QUERY
   })
   @ApiOkResponse({
-    type: String
+    type: Number
   })
   async getCount(): Promise<number> {
     this.logger.debug('Get count of testimonials.');
