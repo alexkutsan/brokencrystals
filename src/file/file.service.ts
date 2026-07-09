@@ -31,7 +31,7 @@ export class FileService {
     this.logger.log(`Reading file: ${file}`);
 
     if (!this.isSafeLocalPath(file)) {
-      throw new Error('invalid file path');
+      throw new Error('Invalid file path');
     }
 
     const resolvedFile = path.resolve(this.allowedRoot, path.normalize(file));
@@ -43,7 +43,7 @@ export class FileService {
 
   async deleteFile(file: string): Promise<boolean> {
     if (!this.isSafeLocalPath(file)) {
-      throw new Error('invalid file path');
+      throw new Error('Invalid file path');
     }
 
     const resolvedFile = path.resolve(this.allowedRoot, path.normalize(file));

@@ -41,11 +41,11 @@ export class FileController {
 
   private validateLocalPath(file: string): string {
     if (typeof file !== 'string' || file.length === 0) {
-      throw new BadRequestException(`Invalid paramater 'path' ${file}`);
+      throw new BadRequestException('Invalid file path');
     }
 
     if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(file) || file.startsWith('//')) {
-      throw new BadRequestException(`Invalid paramater 'path' ${file}`);
+      throw new BadRequestException('Invalid file path');
     }
 
     const normalized = path.normalize(file);
@@ -54,7 +54,7 @@ export class FileController {
       normalized.startsWith('..') ||
       normalized.includes(`..${path.sep}`)
     ) {
-      throw new BadRequestException(`Invalid paramater 'path' ${file}`);
+      throw new BadRequestException('Invalid file path');
     }
 
     return file;
@@ -72,11 +72,11 @@ export class FileController {
 
   private async loadCPFile(cpBaseUrl: string, path: string) {
     if (typeof path !== 'string' || path.length === 0) {
-      throw new BadRequestException(`Invalid paramater 'path' ${path}`);
+      throw new BadRequestException('Invalid file path');
     }
 
     if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(path) || path.startsWith('//')) {
-      throw new BadRequestException(`Invalid paramater 'path' ${path}`);
+      throw new BadRequestException('Invalid file path');
     }
 
     const normalized = path.normalize(path);
@@ -85,12 +85,12 @@ export class FileController {
       normalized.startsWith('..') ||
       normalized.includes(`..${path.sep}`)
     ) {
-      throw new BadRequestException(`Invalid paramater 'path' ${path}`);
+      throw new BadRequestException('Invalid file path');
     }
 
     const allowedPrefixes = ['instance/', 'oslogin/', 'project/'];
     if (!allowedPrefixes.some((prefix) => normalized.startsWith(prefix))) {
-      throw new BadRequestException(`Invalid paramater 'path' ${path}`);
+      throw new BadRequestException('Invalid file path');
     }
 
     const localPath = normalized.replace(/^\/+/, '');
@@ -330,11 +330,11 @@ export class FileController {
       if (typeof raw === 'string' || Buffer.isBuffer(raw)) {
         await fs.promises.access(path.dirname(file), W_OK);
         await fs.promises.writeFile(file, raw);
-        return `File uploaded successfully at ${file}`;
+        return 'File uploaded successfully';
       }
     } catch (err) {
-      this.logger.error(err.message);
-      throw err.message;
+      this.logger.error(err?.message || err);
+      throw new BadRequestException('Invalid file path');
     }
   }
 
@@ -363,7 +363,7 @@ export class FileController {
 
       return stream;
     } catch (err) {
-      this.logger.error(err.message);
+      this.logger.error(err?.message || err);
       res.status(HttpStatus.NOT_FOUND);
     }
   }
