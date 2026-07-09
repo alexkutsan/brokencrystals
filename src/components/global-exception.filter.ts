@@ -29,25 +29,21 @@ export class GlobalExceptionFilter {
     const applicationRef = this.applicationRef;
 
     if (exception instanceof HttpException && exception.getStatus() < 500) {
+      const statusCode = exception.getStatus();
+      const sanitizedBody = this.buildHttpExceptionResponse(exception, statusCode);
+
       if (gql) {
-        throw exception;
+        throw new HttpException(sanitizedBody, statusCode);
       }
 
-      const message = this.sanitizeHttpExceptionMessage(exception);
-
-      return applicationRef.reply(
-        host.getArgByIndex(1),
-        {
-          statusCode: exception.getStatus(),
-          message
-        },
-        exception.getStatus()
-      );
+      return applicationRef.reply(host.getArgByIndex(1), sanitizedBody, statusCode);
     }
 
-    const sanitizedException = new InternalServerErrorException(
-      GlobalExceptionFilter.GENERIC_SERVER_ERROR_MESSAGE
-    );
+    const sanitizedException = new InternalServerErrorException({
+      statusCode: 500,
+      message: GlobalExceptionFilter.GENERIC_SERVER_ERROR_MESSAGE,
+      error: 'Internal Server Error'
+    });
 
     if (gql) {
       throw sanitizedException;
@@ -55,12 +51,20 @@ export class GlobalExceptionFilter {
 
     return applicationRef.reply(
       host.getArgByIndex(1),
-      {
-        statusCode: sanitizedException.getStatus(),
-        message: GlobalExceptionFilter.GENERIC_SERVER_ERROR_MESSAGE
-      },
+      sanitizedException.getResponse(),
       sanitizedException.getStatus()
     );
+  }
+
+  private buildHttpExceptionResponse(
+    exception: HttpException,
+    statusCode: number
+  ): { statusCode: number; message: string | string[]; error: string } {
+    return {
+      statusCode,
+      message: this.sanitizeHttpExceptionMessage(exception),
+      error: this.sanitizeErrorLabel(exception.name)
+    };
   }
 
   private sanitizeHttpExceptionMessage(exception: HttpException): string | string[] {
@@ -79,22 +83,35 @@ export class GlobalExceptionFilter {
     return this.sanitizeText(rawMessage);
   }
 
-  private sanitizeText(value: unknown): string {
-    if (typeof value !== 'string') {
-      return GlobalExceptionFilter.GENERIC_CLIENT_ERROR_MESSAGE;
+  private sanitizeErrorLabel(value: unknown): string {
+    if (typeof value !== 'string' || this.containsSensitiveValue(value)) {
+      return 'Error';
     }
 
-    if (this.containsSensitivePathDisclosure(value)) {
+    return value;
+  }
+
+  private sanitizeText(value: unknown): string {
+    if (typeof value !== 'string' || this.containsSensitiveValue(value)) {
       return GlobalExceptionFilter.GENERIC_CLIENT_ERROR_MESSAGE;
     }
 
     return value;
   }
 
+  private containsSensitiveValue(value: string): boolean {
+    return this.containsSensitivePathDisclosure(value) || this.containsStackTraceDisclosure(value);
+  }
+
   private containsSensitivePathDisclosure(value: string): boolean {
     return (
       /(?:[A-Za-z]:\\|\/)(?:[^\s]+[\\/])+[^\s]*/.test(value) ||
-      value.includes('__dirname')
+      value.includes('__dirname') ||
+      value.includes('__filename')
     );
+  }
+
+  private containsStackTraceDisclosure(value: string): boolean {
+    return /\bat\s+.+\s+\((?:[A-Za-z]:\\|\/).+?:\d+:\d+\)/.test(value);
   }
 }
