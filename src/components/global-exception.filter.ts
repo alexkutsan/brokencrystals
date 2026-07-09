@@ -11,6 +11,9 @@ import { AbstractHttpAdapter } from '@nestjs/core';
 @Catch()
 export class GlobalExceptionFilter {
   private readonly logger = new Logger(GlobalExceptionFilter.name);
+  private static readonly GENERIC_CLIENT_ERROR_MESSAGE = 'Request could not be processed.';
+  private static readonly GENERIC_SERVER_ERROR_MESSAGE =
+    'An internal error has occurred, and the API was unable to service your request.';
 
   constructor(private readonly applicationRef: AbstractHttpAdapter) {}
 
@@ -30,13 +33,7 @@ export class GlobalExceptionFilter {
         throw exception;
       }
 
-      const response = exception.getResponse();
-      const message =
-        typeof response === 'string'
-          ? response
-          : Array.isArray((response as { message?: unknown })?.message)
-            ? (response as { message: unknown[] }).message
-            : (response as { message?: unknown })?.message || exception.message;
+      const message = this.sanitizeHttpExceptionMessage(exception);
 
       return applicationRef.reply(
         host.getArgByIndex(1),
@@ -49,7 +46,7 @@ export class GlobalExceptionFilter {
     }
 
     const sanitizedException = new InternalServerErrorException(
-      'An internal error has occurred, and the API was unable to service your request.'
+      GlobalExceptionFilter.GENERIC_SERVER_ERROR_MESSAGE
     );
 
     if (gql) {
@@ -60,10 +57,44 @@ export class GlobalExceptionFilter {
       host.getArgByIndex(1),
       {
         statusCode: sanitizedException.getStatus(),
-        message:
-          'An internal error has occurred, and the API was unable to service your request.'
+        message: GlobalExceptionFilter.GENERIC_SERVER_ERROR_MESSAGE
       },
       sanitizedException.getStatus()
+    );
+  }
+
+  private sanitizeHttpExceptionMessage(exception: HttpException): string | string[] {
+    const response = exception.getResponse();
+    const rawMessage =
+      typeof response === 'string'
+        ? response
+        : Array.isArray((response as { message?: unknown })?.message)
+          ? (response as { message: unknown[] }).message
+          : (response as { message?: unknown })?.message || exception.message;
+
+    if (Array.isArray(rawMessage)) {
+      return rawMessage.map((message) => this.sanitizeText(message));
+    }
+
+    return this.sanitizeText(rawMessage);
+  }
+
+  private sanitizeText(value: unknown): string {
+    if (typeof value !== 'string') {
+      return GlobalExceptionFilter.GENERIC_CLIENT_ERROR_MESSAGE;
+    }
+
+    if (this.containsSensitivePathDisclosure(value)) {
+      return GlobalExceptionFilter.GENERIC_CLIENT_ERROR_MESSAGE;
+    }
+
+    return value;
+  }
+
+  private containsSensitivePathDisclosure(value: string): boolean {
+    return (
+      /(?:[A-Za-z]:\\|\/)(?:[^\s]+[\\/])+[^\s]*/.test(value) ||
+      value.includes('__dirname')
     );
   }
 }
