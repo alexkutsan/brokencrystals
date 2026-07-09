@@ -93,7 +93,25 @@ export class AppController {
   })
   @Redirect()
   async redirect(@Query('url') url: string) {
-    return { url };
+    const normalizedUrl = typeof url === 'string' ? url.trim() : '';
+
+    if (!normalizedUrl) {
+      throw new BadRequestException('url is required');
+    }
+
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(normalizedUrl);
+    } catch {
+      throw new BadRequestException('Invalid redirect URL');
+    }
+
+    const allowedHosts = new Set(['example.com', 'www.example.com']);
+    if (parsedUrl.protocol !== 'https:' || !allowedHosts.has(parsedUrl.hostname)) {
+      throw new BadRequestException('Invalid redirect URL');
+    }
+
+    return { url: parsedUrl.toString() };
   }
 
   @Post('metadata')
