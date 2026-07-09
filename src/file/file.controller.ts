@@ -39,6 +39,27 @@ import { CloudProvidersMetaData } from './cloud.providers.metadata';
 export class FileController {
   private readonly logger = new Logger(FileController.name);
 
+  private validateLocalPath(file: string): string {
+    if (typeof file !== 'string' || file.length === 0) {
+      throw new BadRequestException(`Invalid paramater 'path' ${file}`);
+    }
+
+    if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(file) || file.startsWith('//')) {
+      throw new BadRequestException(`Invalid paramater 'path' ${file}`);
+    }
+
+    const normalized = path.normalize(file);
+    if (
+      path.isAbsolute(file) ||
+      normalized.startsWith('..') ||
+      normalized.includes(`..${path.sep}`)
+    ) {
+      throw new BadRequestException(`Invalid paramater 'path' ${file}`);
+    }
+
+    return file;
+  }
+
   constructor(private fileService: FileService) {}
 
   private getContentType(contentType: string) {
@@ -103,7 +124,7 @@ export class FileController {
     @Query('type') contentType: string,
     @Res({ passthrough: true }) res: FastifyReply
   ) {
-    const file: Stream = await this.fileService.getFile(path);
+    const file: Stream = await this.fileService.getFile(this.validateLocalPath(path));
     const type = this.getContentType(contentType);
     res.type(type);
 
@@ -302,6 +323,7 @@ export class FileController {
     @Body() raw: string
   ): Promise<string> {
     try {
+      file = this.validateLocalPath(file);
       if (typeof raw === 'string' || Buffer.isBuffer(raw)) {
         await fs.promises.access(path.dirname(file), W_OK);
         await fs.promises.writeFile(file, raw);
@@ -333,7 +355,7 @@ export class FileController {
     @Res({ passthrough: true }) res: FastifyReply
   ) {
     try {
-      const stream = await this.fileService.getFile(file);
+      const stream = await this.fileService.getFile(this.validateLocalPath(file));
       res.type('application/octet-stream');
 
       return stream;
@@ -345,7 +367,7 @@ export class FileController {
 
   @GrpcMethod('FileService', 'ReadFile')
   async readFileGrpc(data: { path: string }): Promise<{ content: string }> {
-    const stream = await this.fileService.getFile(data.path);
+    const stream = await this.fileService.getFile(this.validateLocalPath(data.path));
     const chunks = [];
     for await (const chunk of stream) {
       chunks.push(Buffer.from(chunk));

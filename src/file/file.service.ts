@@ -22,7 +22,7 @@ export class FileService {
   async getFile(file: string): Promise<Readable> {
     this.logger.log(`Reading file: ${file}`);
 
-    if (file.startsWith('http')) {
+    if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(file) || file.startsWith('//')) {
       throw new Error('remote file fetching is not allowed');
     }
 
