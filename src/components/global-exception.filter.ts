@@ -3,7 +3,8 @@ import {
   Catch,
   Logger,
   HttpException,
-  InternalServerErrorException
+  InternalServerErrorException,
+  NotFoundException
 } from '@nestjs/common';
 import { GqlContextType } from '@nestjs/graphql';
 import { AbstractHttpAdapter } from '@nestjs/core';
@@ -62,33 +63,74 @@ export class GlobalExceptionFilter {
   ): { statusCode: number; message: string | string[]; error: string } {
     return {
       statusCode,
-      message: this.sanitizeHttpExceptionMessage(exception),
-      error: this.sanitizeErrorLabel(exception.name)
+      message: this.sanitizeHttpExceptionMessage(exception, statusCode),
+      error: this.sanitizeErrorLabel(exception, statusCode)
     };
   }
 
-  private sanitizeHttpExceptionMessage(exception: HttpException): string | string[] {
-    const response = exception.getResponse();
-    const rawMessage =
-      typeof response === 'string'
-        ? response
-        : Array.isArray((response as { message?: unknown })?.message)
-          ? (response as { message: unknown[] }).message
-          : (response as { message?: unknown })?.message || exception.message;
-
-    if (Array.isArray(rawMessage)) {
-      return rawMessage.map((message) => this.sanitizeText(message));
+  private sanitizeHttpExceptionMessage(
+    exception: HttpException,
+    statusCode: number
+  ): string | string[] {
+    if (statusCode === 404) {
+      return 'Not Found';
     }
 
-    return this.sanitizeText(rawMessage);
+    if (statusCode === 401) {
+      return 'Unauthorized';
+    }
+
+    if (statusCode === 403) {
+      return 'Forbidden';
+    }
+
+    if (statusCode === 400) {
+      const response = exception.getResponse();
+      const rawMessage =
+        typeof response === 'string'
+          ? response
+          : Array.isArray((response as { message?: unknown })?.message)
+            ? (response as { message: unknown[] }).message
+            : (response as { message?: unknown })?.message || exception.message;
+
+      if (Array.isArray(rawMessage)) {
+        return rawMessage.map((message) => this.sanitizeText(message));
+      }
+
+      return this.sanitizeText(rawMessage);
+    }
+
+    return GlobalExceptionFilter.GENERIC_CLIENT_ERROR_MESSAGE;
   }
 
-  private sanitizeErrorLabel(value: unknown): string {
-    if (typeof value !== 'string' || this.containsSensitiveValue(value)) {
-      return 'Error';
+  private sanitizeErrorLabel(exception: HttpException, statusCode: number): string {
+    if (statusCode === 404 || exception instanceof NotFoundException) {
+      return 'Not Found';
     }
 
-    return value;
+    if (statusCode === 401) {
+      return 'Unauthorized';
+    }
+
+    if (statusCode === 403) {
+      return 'Forbidden';
+    }
+
+    if (statusCode === 400) {
+      const response = exception.getResponse();
+      const errorLabel =
+        typeof response === 'object' && response !== null
+          ? (response as { error?: unknown }).error
+          : exception.name;
+
+      if (typeof errorLabel !== 'string' || this.containsSensitiveValue(errorLabel)) {
+        return 'Bad Request';
+      }
+
+      return errorLabel;
+    }
+
+    return 'Error';
   }
 
   private sanitizeText(value: unknown): string {
@@ -106,6 +148,7 @@ export class GlobalExceptionFilter {
   private containsSensitivePathDisclosure(value: string): boolean {
     return (
       /(?:[A-Za-z]:\\|\/)(?:[^\s]+[\\/])+[^\s]*/.test(value) ||
+      /file:\/\//i.test(value) ||
       value.includes('__dirname') ||
       value.includes('__filename')
     );
