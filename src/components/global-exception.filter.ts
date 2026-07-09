@@ -15,6 +15,8 @@ export class GlobalExceptionFilter {
   private static readonly GENERIC_CLIENT_ERROR_MESSAGE = 'Request could not be processed.';
   private static readonly GENERIC_SERVER_ERROR_MESSAGE =
     'An internal error has occurred, and the API was unable to service your request.';
+  private static readonly PATH_DISCLOSURE_PATTERN =
+    /(?:[A-Za-z]:\\|\/)(?:[^\s]+[\\/])+[^\s]*/g;
 
   constructor(private readonly applicationRef: AbstractHttpAdapter) {}
 
@@ -22,7 +24,8 @@ export class GlobalExceptionFilter {
     const gql = host.getType<GqlContextType>() === 'graphql';
 
     if (exception instanceof Error) {
-      this.logger.error(exception.message, exception.stack);
+      const sanitizedError = this.sanitizeErrorForLogging(exception);
+      this.logger.error(sanitizedError.message, sanitizedError.stack);
     } else {
       this.logger.error('Unhandled non-error exception thrown');
     }
@@ -156,5 +159,20 @@ export class GlobalExceptionFilter {
 
   private containsStackTraceDisclosure(value: string): boolean {
     return /\bat\s+.+\s+\((?:[A-Za-z]:\\|\/).+?:\d+:\d+\)/.test(value);
+  }
+
+  private sanitizeErrorForLogging(error: Error): { message: string; stack?: string } {
+    return {
+      message: this.redactSensitivePaths(error.message) || error.name,
+      stack: this.redactSensitivePaths(error.stack)
+    };
+  }
+
+  private redactSensitivePaths(value?: string): string | undefined {
+    if (!value) {
+      return value;
+    }
+
+    return value.replace(GlobalExceptionFilter.PATH_DISCLOSURE_PATTERN, '[redacted-path]');
   }
 }
