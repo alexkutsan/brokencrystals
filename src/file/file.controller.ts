@@ -358,7 +358,7 @@ export class FileController {
     @Res({ passthrough: true }) res: FastifyReply
   ) {
     try {
-      const stream = await this.fileService.getFile(this.validateLocalPath(file));
+      const stream = await this.fileService.getFile(file);
       res.type('application/octet-stream');
 
       return stream;

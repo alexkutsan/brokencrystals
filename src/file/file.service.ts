@@ -9,32 +9,31 @@ export class FileService {
   private readonly logger = new Logger(FileService.name);
   private readonly allowedRoot = path.resolve(process.cwd());
 
-  private isSafeLocalPath(file: string): boolean {
+  private resolveSafePath(file: string): string {
     if (typeof file !== 'string' || file.length === 0) {
-      return false;
-    }
-
-    if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(file) || file.startsWith('//')) {
-      return false;
-    }
-
-    const normalized = path.normalize(file);
-    const resolved = path.resolve(this.allowedRoot, normalized);
-    return (
-      !normalized.startsWith('..') &&
-      !normalized.includes(`..${path.sep}`) &&
-      resolved.startsWith(this.allowedRoot + path.sep)
-    );
-  }
-
-  async getFile(file: string): Promise<Readable> {
-    this.logger.log(`Reading file: ${file}`);
-
-    if (!this.isSafeLocalPath(file)) {
       throw new Error('Invalid file path');
     }
 
-    const resolvedFile = path.resolve(this.allowedRoot, path.normalize(file));
+    if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(file) || file.startsWith('//') || path.isAbsolute(file)) {
+      throw new Error('Invalid file path');
+    }
+
+    const normalized = path.normalize(file);
+    if (normalized.startsWith('..') || normalized.includes(`..${path.sep}`)) {
+      throw new Error('Invalid file path');
+    }
+
+    const resolved = path.resolve(this.allowedRoot, normalized);
+    if (!resolved.startsWith(this.allowedRoot + path.sep)) {
+      throw new Error('Invalid file path');
+    }
+
+    return resolved;
+  }
+
+  async getFile(file: string): Promise<Readable> {
+    const resolvedFile = this.resolveSafePath(file);
+    this.logger.log(`Reading file: ${resolvedFile}`);
 
     await fs.promises.access(resolvedFile, R_OK);
 
@@ -42,11 +41,7 @@ export class FileService {
   }
 
   async deleteFile(file: string): Promise<boolean> {
-    if (!this.isSafeLocalPath(file)) {
-      throw new Error('Invalid file path');
-    }
-
-    const resolvedFile = path.resolve(this.allowedRoot, path.normalize(file));
+    const resolvedFile = this.resolveSafePath(file);
     await fs.promises.unlink(resolvedFile);
     return true;
   }
