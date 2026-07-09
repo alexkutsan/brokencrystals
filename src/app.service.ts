@@ -1,5 +1,4 @@
-import { HttpException, Injectable, Logger } from '@nestjs/common';
-import { spawn } from 'child_process';
+import { HttpException, Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { UsersService } from './users/users.service';
 import { AppModuleConfigProperties } from './app.module.config.properties';
@@ -10,6 +9,7 @@ import { UserDto } from './users/api/UserDto';
 @Injectable()
 export class AppService {
   private readonly logger = new Logger(AppService.name);
+  private readonly allowedCommands = new Set(['ls', 'pwd', 'whoami']);
 
   constructor(
     private readonly configService: ConfigService,
@@ -17,32 +17,15 @@ export class AppService {
   ) {}
 
   async launchCommand(command: string): Promise<string> {
-    this.logger.debug(`launch ${command} command`);
+    const trimmedCommand = typeof command === 'string' ? command.trim() : '';
+    const [exec, ...args] = trimmedCommand.split(/\s+/);
 
-    return new Promise((res, rej) => {
-      try {
-        const [exec, ...args] = command.split(' ');
-        const ps = spawn(exec, args);
+    if (!exec || !this.allowedCommands.has(exec) || args.length > 0) {
+      throw new BadRequestException('Unsupported command');
+    }
 
-        ps.stdout.on('data', (data: Buffer) => {
-          this.logger.debug(`stdout: ${data}`);
-          res(data.toString('ascii'));
-        });
-
-        ps.stderr.on('data', (data: Buffer) => {
-          this.logger.debug(`stderr: ${data}`);
-          res(data.toString('ascii'));
-        });
-
-        ps.on('error', (err) => rej(err.message));
-
-        ps.on('close', (code) =>
-          this.logger.debug(`child process exited with code ${code}`)
-        );
-      } catch (err) {
-        rej(err.message);
-      }
-    });
+    this.logger.debug(`رفض command execution request for ${exec}`);
+    return `Command ${exec} is not available in this deployment`;
   }
 
   getConfig(): AppConfig {

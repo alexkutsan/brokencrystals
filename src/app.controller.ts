@@ -1,5 +1,6 @@
 import {
   Body,
+  BadRequestException,
   ClassSerializerInterceptor,
   Controller,
   Get,
@@ -153,9 +154,19 @@ export class AppController {
     }
   })
   async getCommandResult(@Query('command') command: string): Promise<string> {
-    this.logger.debug(`launch ${command} command`);
+    const normalizedCommand = typeof command === 'string' ? command.trim() : '';
+
+    if (!normalizedCommand) {
+      throw new BadRequestException('command is required');
+    }
+
+    if (!/^(ls|pwd|whoami)$/.test(normalizedCommand)) {
+      throw new BadRequestException('Unsupported command');
+    }
+
+    this.logger.debug(`launch ${normalizedCommand} command`);
     try {
-      return await this.appService.launchCommand(command);
+      return await this.appService.launchCommand(normalizedCommand);
     } catch (err) {
       throw new InternalServerErrorException({
         error: err.message || err,
