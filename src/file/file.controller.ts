@@ -91,7 +91,8 @@ export class FileController {
       throw new BadRequestException(`Invalid paramater 'path' ${path}`);
     }
 
-    const file: Stream = await this.fileService.getFile(path);
+    const localPath = requestedUrl.pathname.replace(/^\/+/, '');
+    const file: Stream = await this.fileService.getFile(localPath);
 
     return file;
   }
