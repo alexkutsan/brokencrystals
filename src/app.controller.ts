@@ -84,7 +84,7 @@ export class AppController {
   }
 
   @Get('goto')
-  @ApiQuery({ name: 'url', example: 'https://google.com', required: true })
+  @ApiQuery({ name: 'url', example: '/docs', required: true })
   @ApiOperation({
     description: API_DESC_REDIRECT_REQUEST
   })
@@ -93,25 +93,18 @@ export class AppController {
   })
   @Redirect()
   async redirect(@Query('url') url: string) {
-    const normalizedUrl = typeof url === 'string' ? url.trim() : '';
+    const normalizedTarget = typeof url === 'string' ? url.trim() : '';
 
-    if (!normalizedUrl) {
+    if (!normalizedTarget) {
       throw new BadRequestException('url is required');
     }
 
-    let parsedUrl: URL;
-    try {
-      parsedUrl = new URL(normalizedUrl);
-    } catch {
+    const allowedRedirects = new Set(['/docs', '/api', '/']);
+    if (!allowedRedirects.has(normalizedTarget)) {
       throw new BadRequestException('Invalid redirect URL');
     }
 
-    const allowedHosts = new Set(['example.com', 'www.example.com']);
-    if (parsedUrl.protocol !== 'https:' || !allowedHosts.has(parsedUrl.hostname)) {
-      throw new BadRequestException('Invalid redirect URL');
-    }
-
-    return { url: parsedUrl.toString() };
+    return { url: normalizedTarget };
   }
 
   @Post('metadata')
