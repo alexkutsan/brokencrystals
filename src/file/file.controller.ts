@@ -54,6 +54,18 @@ export class FileController {
       throw new BadRequestException(`Invalid paramater 'path' ${path}`);
     }
 
+    const baseUrl = new URL(cpBaseUrl);
+    const requestedUrl = new URL(path);
+
+    if (
+      requestedUrl.protocol !== baseUrl.protocol ||
+      requestedUrl.hostname !== baseUrl.hostname ||
+      requestedUrl.port !== baseUrl.port ||
+      !requestedUrl.pathname.startsWith(baseUrl.pathname)
+    ) {
+      throw new BadRequestException(`Invalid paramater 'path' ${path}`);
+    }
+
     const file: Stream = await this.fileService.getFile(path);
 
     return file;
