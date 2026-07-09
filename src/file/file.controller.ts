@@ -71,27 +71,29 @@ export class FileController {
   }
 
   private async loadCPFile(cpBaseUrl: string, path: string) {
-    if (typeof path !== 'string' || !path.startsWith(cpBaseUrl)) {
+    if (typeof path !== 'string' || path.length === 0) {
       throw new BadRequestException(`Invalid paramater 'path' ${path}`);
     }
 
-    const baseUrl = new URL(cpBaseUrl);
-    const requestedUrl = new URL(path);
-
-    if (requestedUrl.origin !== baseUrl.origin) {
+    if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(path) || path.startsWith('//')) {
       throw new BadRequestException(`Invalid paramater 'path' ${path}`);
     }
 
+    const normalized = path.normalize(path);
     if (
-      requestedUrl.protocol !== baseUrl.protocol ||
-      requestedUrl.hostname !== baseUrl.hostname ||
-      requestedUrl.port !== baseUrl.port ||
-      !requestedUrl.pathname.startsWith(baseUrl.pathname)
+      path.isAbsolute(path) ||
+      normalized.startsWith('..') ||
+      normalized.includes(`..${path.sep}`)
     ) {
       throw new BadRequestException(`Invalid paramater 'path' ${path}`);
     }
 
-    const localPath = requestedUrl.pathname.replace(/^\/+/, '');
+    const allowedPrefixes = ['instance/', 'oslogin/', 'project/'];
+    if (!allowedPrefixes.some((prefix) => normalized.startsWith(prefix))) {
+      throw new BadRequestException(`Invalid paramater 'path' ${path}`);
+    }
+
+    const localPath = normalized.replace(/^\/+/, '');
     const file: Stream = await this.fileService.getFile(localPath);
 
     return file;
