@@ -10,6 +10,15 @@ export class FileService {
   private readonly logger = new Logger(FileService.name);
   private cloudProviders = new CloudProvidersMetaData();
 
+  private isSafeLocalPath(file: string): boolean {
+    const normalized = path.normalize(file);
+    return (
+      !path.isAbsolute(file) &&
+      !normalized.startsWith('..') &&
+      !normalized.includes(`..${path.sep}`)
+    );
+  }
+
   async getFile(file: string): Promise<Readable> {
     this.logger.log(`Reading file: ${file}`);
 
@@ -26,6 +35,10 @@ export class FileService {
         throw new Error(`no such file or directory, access '${file}'`);
       }
     } else {
+      if (!this.isSafeLocalPath(file)) {
+        throw new Error('invalid file path');
+      }
+
       file = path.resolve(process.cwd(), file);
 
       await fs.promises.access(file, R_OK);
@@ -40,6 +53,10 @@ export class FileService {
     } else if (file.startsWith('http')) {
       throw new Error('cannot delete file from this location');
     } else {
+      if (!this.isSafeLocalPath(file)) {
+        throw new Error('invalid file path');
+      }
+
       file = path.resolve(process.cwd(), file);
       await fs.promises.unlink(file);
       return true;
