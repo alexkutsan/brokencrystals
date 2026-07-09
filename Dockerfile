@@ -6,6 +6,8 @@ FROM node:18-alpine AS build
 
 WORKDIR /usr/src/app
 
+RUN apk add --no-cache python3 make g++ libxml2-dev
+
 # Copy and build NestJS server project
 COPY --chown=node:node package*.json ./
 COPY --chown=node:node tsconfig.build.json ./
@@ -44,6 +46,8 @@ USER node
 FROM node:18-alpine AS production
 
 WORKDIR /usr/src/app
+
+RUN apk add --no-cache libxml2
 
 COPY --chown=node:node .env ./
 COPY --chown=node:node config ./config
