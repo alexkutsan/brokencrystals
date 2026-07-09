@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
-import { decode, encode } from 'jwt-simple';
+import { encode } from 'jwt-simple';
+import { verify } from 'jsonwebtoken';
 import { JwtTokenProcessor as JwtTokenProcessor } from './jwt.token.processor';
 
 export class JwtTokenWithRSASignatureKeysProcessor extends JwtTokenProcessor {
@@ -20,12 +21,10 @@ export class JwtTokenWithRSASignatureKeysProcessor extends JwtTokenProcessor {
       throw new Error('Invalid JWT algorithm');
     }
 
-    return decode(
-      token,
-      this.publicKey,
-      true,
-      JwtTokenWithRSASignatureKeysProcessor.EXPECTED_ALG
-    );
+    return verify(token, this.publicKey, {
+      algorithms: [JwtTokenWithRSASignatureKeysProcessor.EXPECTED_ALG],
+      allowInvalidAsymmetricKeyTypes: false
+    });
   }
 
   async createToken(payload: unknown): Promise<string> {
