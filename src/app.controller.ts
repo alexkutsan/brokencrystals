@@ -168,10 +168,11 @@ export class AppController {
     try {
       return await this.appService.launchCommand(normalizedCommand);
     } catch (err) {
-      throw new InternalServerErrorException({
-        error: err.message || err,
-        location: __filename
-      });
+      this.logger.error(
+        `Failed to launch command ${normalizedCommand}`,
+        err instanceof Error ? err.stack : undefined
+      );
+      throw new InternalServerErrorException('An internal error has occurred');
     }
   }
 
