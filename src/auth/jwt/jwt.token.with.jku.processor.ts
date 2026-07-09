@@ -16,7 +16,10 @@ export class JwtTokenWithJKUProcessor extends JwtTokenProcessor {
     this.log.debug('Call validateToken');
     const [header, payload] = this.parse(token);
 
-    const url = header.jku;
+    const url = typeof header.jku === 'string' ? header.jku : this.jkuUrl;
+    if (url !== this.jkuUrl) {
+      throw new Error('Invalid JKU value');
+    }
     this.log.debug(`Calling jwk url: ${url}`);
     const jwkRes: jose.JWK = await this.httpClient.loadJSON(url);
     const keyLike = await jose.importJWK(jwkRes);
