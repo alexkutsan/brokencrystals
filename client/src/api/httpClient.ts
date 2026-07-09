@@ -28,9 +28,7 @@ export function getTestimonials(): Promise<any> {
 
 export function getTestimonialsCount(): Promise<any> {
   return makeApiRequest({
-    url: `${ApiUrl.Testimonials}/count?query=${encodeURIComponent(
-      'select count(1) as count from testimonial'
-    )}`,
+    url: `${ApiUrl.Testimonials}/count`,
     method: 'get'
   });
 }

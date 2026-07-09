@@ -7,7 +7,6 @@ interface InnerHtmlProps {
   allowRerender?: boolean;
 }
 
-// based on https://github.com/christo-pr/dangerously-set-html-content
 export const InnerHtml: FC<InnerHtmlProps> = ({
   html,
   tagName,
@@ -26,12 +25,8 @@ export const InnerHtml: FC<InnerHtmlProps> = ({
     }
     isFirstRender.current = Boolean(allowRerender);
 
-    // Create a 'tiny' document and parse the html string
-    const slotHtml = document.createRange().createContextualFragment(html);
-    // Clear the container
-    elementRef.current.innerHTML = '';
-    // Append the new content
-    elementRef.current.appendChild(slotHtml);
+    // Render as text to prevent DOM XSS from untrusted HTML content.
+    elementRef.current.textContent = html;
   }, [html, elementRef]);
 
   return createElement(tagName ?? 'div', { ...rest, ref: elementRef });
