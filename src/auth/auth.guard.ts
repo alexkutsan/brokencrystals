@@ -33,11 +33,10 @@ export class AuthGuard implements CanActivate {
       }
 
       return await this.verifyToken(token, context);
-    } catch (err) {
-      this.logger.debug(`Failed to validate token: ${err.message}`);
+    } catch {
+      this.logger.debug('Failed to validate token');
       throw new UnauthorizedException({
-        error: 'Unauthorized',
-        line: __filename
+        error: 'Unauthorized'
       });
     }
   }
@@ -66,19 +65,13 @@ export class AuthGuard implements CanActivate {
     token: string,
     context: ExecutionContext
   ): Promise<boolean> {
-    const processorType = this.reflector.get<JwtProcessorType>(
-      JwTypeMetadataField,
-      context.getHandler()
-    );
+    const processorType =
+      this.reflector.get<JwtProcessorType>(
+        JwTypeMetadataField,
+        context.getHandler()
+      ) ?? JwtProcessorType.BEARER;
 
-    try {
-      return !!(await this.authService.validateToken(token, processorType));
-    } catch {
-      return !!(await this.authService.validateToken(
-        token,
-        JwtProcessorType.BEARER
-      ));
-    }
+    return !!(await this.authService.validateToken(token, processorType));
   }
 
   private checkIsBearer(bearer: string): boolean {

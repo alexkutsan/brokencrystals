@@ -39,6 +39,27 @@ import { CloudProvidersMetaData } from './cloud.providers.metadata';
 export class FileController {
   private readonly logger = new Logger(FileController.name);
 
+  private validateLocalPath(file: string): string {
+    if (typeof file !== 'string' || file.length === 0) {
+      throw new BadRequestException('Invalid file path');
+    }
+
+    if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(file) || file.startsWith('//')) {
+      throw new BadRequestException('Invalid file path');
+    }
+
+    const normalized = path.normalize(file);
+    if (
+      path.isAbsolute(file) ||
+      normalized.startsWith('..') ||
+      normalized.includes(`..${path.sep}`)
+    ) {
+      throw new BadRequestException('Invalid file path');
+    }
+
+    return file;
+  }
+
   constructor(private fileService: FileService) {}
 
   private getContentType(contentType: string) {
@@ -50,11 +71,30 @@ export class FileController {
   }
 
   private async loadCPFile(cpBaseUrl: string, path: string) {
-    if (!path.startsWith(cpBaseUrl)) {
-      throw new BadRequestException(`Invalid paramater 'path' ${path}`);
+    if (typeof path !== 'string' || path.length === 0) {
+      throw new BadRequestException('Invalid file path');
     }
 
-    const file: Stream = await this.fileService.getFile(path);
+    if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(path) || path.startsWith('//')) {
+      throw new BadRequestException('Invalid file path');
+    }
+
+    const normalized = path.normalize(path);
+    if (
+      path.isAbsolute(path) ||
+      normalized.startsWith('..') ||
+      normalized.includes(`..${path.sep}`)
+    ) {
+      throw new BadRequestException('Invalid file path');
+    }
+
+    const allowedPrefixes = ['instance/', 'oslogin/', 'project/'];
+    if (!allowedPrefixes.some((prefix) => normalized.startsWith(prefix))) {
+      throw new BadRequestException('Invalid file path');
+    }
+
+    const localPath = normalized.replace(/^\/+/, '');
+    const file: Stream = await this.fileService.getFile(localPath);
 
     return file;
   }
@@ -87,7 +127,7 @@ export class FileController {
     @Query('type') contentType: string,
     @Res({ passthrough: true }) res: FastifyReply
   ) {
-    const file: Stream = await this.fileService.getFile(path);
+    const file: Stream = await this.fileService.getFile(this.validateLocalPath(path));
     const type = this.getContentType(contentType);
     res.type(type);
 
@@ -268,7 +308,7 @@ export class FileController {
     description: 'File deleted successfully'
   })
   async deleteFile(@Query('path') path: string): Promise<void> {
-    await this.fileService.deleteFile(path);
+    await this.fileService.deleteFile(this.validateLocalPath(path));
   }
 
   @Put('raw')
@@ -286,14 +326,15 @@ export class FileController {
     @Body() raw: string
   ): Promise<string> {
     try {
+      file = this.validateLocalPath(file);
       if (typeof raw === 'string' || Buffer.isBuffer(raw)) {
         await fs.promises.access(path.dirname(file), W_OK);
         await fs.promises.writeFile(file, raw);
-        return `File uploaded successfully at ${file}`;
+        return 'File uploaded successfully';
       }
     } catch (err) {
-      this.logger.error(err.message);
-      throw err.message;
+      this.logger.error(err?.message || err);
+      throw new BadRequestException('Invalid file path');
     }
   }
 
@@ -317,19 +358,19 @@ export class FileController {
     @Res({ passthrough: true }) res: FastifyReply
   ) {
     try {
-      const stream = await this.fileService.getFile(file);
+      const stream = await this.fileService.getFile(this.validateLocalPath(file));
       res.type('application/octet-stream');
 
       return stream;
     } catch (err) {
-      this.logger.error(err.message);
+      this.logger.error(err?.message || err);
       res.status(HttpStatus.NOT_FOUND);
     }
   }
 
   @GrpcMethod('FileService', 'ReadFile')
   async readFileGrpc(data: { path: string }): Promise<{ content: string }> {
-    const stream = await this.fileService.getFile(data.path);
+    const stream = await this.fileService.getFile(this.validateLocalPath(data.path));
     const chunks = [];
     for await (const chunk of stream) {
       chunks.push(Buffer.from(chunk));

@@ -2,47 +2,47 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Readable } from 'stream';
 import * as fs from 'fs';
 import * as path from 'path';
-import { CloudProvidersMetaData } from './cloud.providers.metadata';
 import { R_OK } from 'constants';
 
 @Injectable()
 export class FileService {
   private readonly logger = new Logger(FileService.name);
-  private cloudProviders = new CloudProvidersMetaData();
+  private readonly allowedRoot = path.resolve(process.cwd());
+
+  private resolveSafePath(file: string): string {
+    if (typeof file !== 'string' || file.length === 0) {
+      throw new Error('Invalid file path');
+    }
+
+    if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(file) || file.startsWith('//') || path.isAbsolute(file)) {
+      throw new Error('Invalid file path');
+    }
+
+    const normalized = path.normalize(file);
+    if (normalized.startsWith('..') || normalized.includes(`..${path.sep}`)) {
+      throw new Error('Invalid file path');
+    }
+
+    const resolved = path.resolve(this.allowedRoot, normalized);
+    if (resolved !== this.allowedRoot && !resolved.startsWith(this.allowedRoot + path.sep)) {
+      throw new Error('Invalid file path');
+    }
+
+    return resolved;
+  }
 
   async getFile(file: string): Promise<Readable> {
-    this.logger.log(`Reading file: ${file}`);
+    const resolvedFile = this.resolveSafePath(file);
+    this.logger.log(`Reading file: ${resolvedFile}`);
 
-    if (file.startsWith('/')) {
-      await fs.promises.access(file, R_OK);
+    await fs.promises.access(resolvedFile, R_OK);
 
-      return fs.createReadStream(file);
-    } else if (file.startsWith('http')) {
-      const content = await this.cloudProviders.get(file);
-
-      if (content) {
-        return Readable.from(content);
-      } else {
-        throw new Error(`no such file or directory, access '${file}'`);
-      }
-    } else {
-      file = path.resolve(process.cwd(), file);
-
-      await fs.promises.access(file, R_OK);
-
-      return fs.createReadStream(file);
-    }
+    return fs.createReadStream(resolvedFile);
   }
 
   async deleteFile(file: string): Promise<boolean> {
-    if (file.startsWith('/')) {
-      throw new Error('cannot delete file from this location');
-    } else if (file.startsWith('http')) {
-      throw new Error('cannot delete file from this location');
-    } else {
-      file = path.resolve(process.cwd(), file);
-      await fs.promises.unlink(file);
-      return true;
-    }
+    const resolvedFile = this.resolveSafePath(file);
+    await fs.promises.unlink(resolvedFile);
+    return true;
   }
 }

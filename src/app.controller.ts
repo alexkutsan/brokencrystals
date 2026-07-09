@@ -1,5 +1,6 @@
 import {
   Body,
+  BadRequestException,
   ClassSerializerInterceptor,
   Controller,
   Get,
@@ -83,7 +84,7 @@ export class AppController {
   }
 
   @Get('goto')
-  @ApiQuery({ name: 'url', example: 'https://google.com', required: true })
+  @ApiQuery({ name: 'url', example: '/docs', required: true })
   @ApiOperation({
     description: API_DESC_REDIRECT_REQUEST
   })
@@ -92,7 +93,18 @@ export class AppController {
   })
   @Redirect()
   async redirect(@Query('url') url: string) {
-    return { url };
+    const normalizedTarget = typeof url === 'string' ? url.trim() : '';
+
+    if (!normalizedTarget) {
+      throw new BadRequestException('url is required');
+    }
+
+    const allowedRedirects = new Set(['/docs', '/api', '/']);
+    if (!allowedRedirects.has(normalizedTarget)) {
+      throw new BadRequestException('Invalid redirect URL');
+    }
+
+    return { url: normalizedTarget };
   }
 
   @Post('metadata')
@@ -153,14 +165,25 @@ export class AppController {
     }
   })
   async getCommandResult(@Query('command') command: string): Promise<string> {
-    this.logger.debug(`launch ${command} command`);
+    const normalizedCommand = typeof command === 'string' ? command.trim() : '';
+
+    if (!normalizedCommand) {
+      throw new BadRequestException('command is required');
+    }
+
+    if (!/^(ls|pwd|whoami)$/.test(normalizedCommand)) {
+      throw new BadRequestException('Unsupported command');
+    }
+
+    this.logger.debug(`launch ${normalizedCommand} command`);
     try {
-      return await this.appService.launchCommand(command);
+      return await this.appService.launchCommand(normalizedCommand);
     } catch (err) {
-      throw new InternalServerErrorException({
-        error: err.message || err,
-        location: __filename
-      });
+      this.logger.error(
+        `Failed to launch command ${normalizedCommand}`,
+        err instanceof Error ? err.stack : undefined
+      );
+      throw new InternalServerErrorException('An internal error has occurred');
     }
   }
 
@@ -252,6 +275,8 @@ export class AppController {
   }
 
   @Get('/config')
+  @UseGuards(AuthGuard)
+  @JwtType(JwtProcessorType.RSA)
   @ApiOperation({
     description: API_DESC_CONFIG_SERVER
   })
@@ -259,39 +284,7 @@ export class AppController {
     type: AppConfig
   })
   getConfig(): AppConfig {
-    const config = this.appService.getConfig();
-    return config;
-  }
-
-  @Get('/secrets')
-  @ApiOperation({
-    description: SWAGGER_DESC_SECRETS
-  })
-  @ApiOkResponse({
-    type: Object
-  })
-  getSecrets(): Record<string, string> {
-    const secrets = {
-      codeclimate:
-        'CODECLIMATE_REPO_TOKEN=62864c476ade6ab9d10d0ce0901ae2c211924852a28c5f960ae5165c1fdfec73',
-      facebook:
-        'EAACEdEose0cBAHyDF5HI5o2auPWv3lPP3zNYuWWpjMrSaIhtSvX73lsLOcas5k8GhC5HgOXnbF3rXRTczOpsbNb54CQL8LcQEMhZAWAJzI0AzmL23hZByFAia5avB6Q4Xv4u2QVoAdH0mcJhYTFRpyJKIAyDKUEBzz0GgZDZD',
-      google_b64: 'QUl6YhT6QXlEQnbTr2dSdEI1W7yL2mFCX3c4PPP5NlpkWE65NkZV',
-      google_oauth:
-        '188968487735-c7hh7k87juef6vv84697sinju2bet7gn.apps.googleusercontent.com',
-      google_oauth_token:
-        'ya29.a0TgU6SMDItdQQ9J7j3FVgJuByTTevl0FThTEkBs4pA4-9tFREyf2cfcL-_JU6Trg1O0NWwQKie4uGTrs35kmKlxohWgcAl8cg9DTxRx-UXFS-S1VYPLVtQLGYyNTfGp054Ad3ej73-FIHz3RZY43lcKSorbZEY4BI',
-      heroku:
-        'herokudev.staging.endosome.975138 pid=48751 request_id=0e9a8698-a4d2-4925-a1a5-113234af5f60',
-      hockey_app: 'HockeySDK: 203d3af93f4a218bfb528de08ae5d30ff65e1cf',
-      outlook:
-        'https://outlook.office.com/webhook/7dd49fc6-1975-443d-806c-08ebe8f81146@a532313f-11ec-43a2-9a7a-d2e27f4f3478/IncomingWebhook/8436f62b50ab41b3b93ba1c0a50a0b88/eff4cd58-1bb8-4899-94de-795f656b4a18',
-      paypal:
-        'access_token$production$x0lb4r69dvmmnufd$3ea7cb281754b7da7dac131ef5783321',
-      slack:
-        'xoxo-175588824543-175748345725-176608801663-826315f84e553d482bb7e73e8322sdf3'
-    };
-    return secrets;
+    return this.appService.getConfig();
   }
 
   @Get('/v1/userinfo/:email')

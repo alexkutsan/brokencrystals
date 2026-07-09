@@ -165,11 +165,11 @@ export class ProductsController {
     @Headers('x-product-name') productName: string
   ): Promise<void> {
     try {
-      const query = `UPDATE product SET views_count = views_count + 1 WHERE name = '${productName}'`;
-      return await this.productsService.updateProduct(query);
+      return await this.productsService.updateProduct(productName);
     } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
       throw new InternalServerErrorException({
-        error: err.message,
+        error: message,
         location: __filename
       });
     }
@@ -179,8 +179,7 @@ export class ProductsController {
   async viewProductGrpc(data: {
     productName: string;
   }): Promise<{ success: boolean }> {
-    const query = `UPDATE product SET views_count = views_count + 1 WHERE name = '${data.productName}'`;
-    await this.productsService.updateProduct(query);
+    await this.productsService.updateProduct(data.productName);
     return { success: true };
   }
 }
