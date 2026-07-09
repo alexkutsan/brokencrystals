@@ -3,6 +3,8 @@ import { decode, encode } from 'jwt-simple';
 import { JwtTokenProcessor as JwtTokenProcessor } from './jwt.token.processor';
 
 export class JwtTokenWithRSAKeysProcessor extends JwtTokenProcessor {
+  private static readonly EXPECTED_ALG = 'RS256';
+
   constructor(
     private publicKey: string,
     private privateKey: string
@@ -13,11 +15,12 @@ export class JwtTokenWithRSAKeysProcessor extends JwtTokenProcessor {
   async validateToken(token: string): Promise<unknown> {
     this.log.debug('Call validateToken');
 
-    const [header, payload] = this.parse(token);
-    if (header.alg === 'none') {
-      return payload;
+    const [header] = this.parse(token);
+    if (header.alg !== JwtTokenWithRSAKeysProcessor.EXPECTED_ALG) {
+      throw new Error('Invalid JWT algorithm');
     }
-    return decode(token, this.publicKey, false, header.alg);
+
+    return decode(token, this.publicKey, false, JwtTokenWithRSAKeysProcessor.EXPECTED_ALG);
   }
 
   async createToken(payload: unknown): Promise<string> {
